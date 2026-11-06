@@ -9,7 +9,7 @@ Sends a message to August's Telegram chat (`<TELEGRAM_CHAT_ID>`) via an n8n webh
 
 ## How to send a message
 
-1. **Read the secret** from `C:\Users\augus\.claude\skills\telegram-push\.secret` (single line, no whitespace). If the file is missing or empty, stop and tell August to populate it — don't guess.
+1. **Read the secret** from `%USERPROFILE%\.claude\skills\telegram-push\.secret` (single line, no whitespace). If the file is missing or empty, stop and tell August to populate it — don't guess.
 2. **POST** to `https://<your-n8n-host>/webhook/claude-telegram` with:
    - Header `X-Webhook-Secret: <the secret>`
    - Header `Content-Type: application/json`

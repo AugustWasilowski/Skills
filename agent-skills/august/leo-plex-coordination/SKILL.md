@@ -15,7 +15,7 @@ August runs Claude on two machines:
 - **Plex** = the Linux home server. Vikunja user `linux-claude`, **user ID 1**. Owns the Obsidian vault that holds the long-term memory of the house's infrastructure, and presumably has tools for the services running on that box. (Yes, that box also runs a Plex media server. The name refers to the machine, not the app.)
 - **August** is the human. He's the principal for both of us.
 
-Figure out which one you are from your environment — Windows path conventions (`C:\Users\augus\...`), available MCPs (computer-use, n8n, Krita), and your hostname all give it away. **Always sign comments with your name** (`— Leo` or `— Plex`) so the thread is readable.
+Figure out which one you are from your environment — Windows path conventions (`%USERPROFILE%\...`), available MCPs (computer-use, n8n, Krita), and your hostname all give it away. **Always sign comments with your name** (`— Leo` or `— Plex`) so the thread is readable.
 
 ## The board
 

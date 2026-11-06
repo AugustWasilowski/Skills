@@ -9,7 +9,7 @@ Outputs (default dir `F:\Snail\TechArt\Videos` unless told otherwise):
 1. `<Name>.mp4` - original English audio, Chinese subs burnt in, + `<Name>.zh.srt`
 2. `<Name>_ZH_dub.mp4` - a:0 Chinese dub (default), a:1 English original, English subs burnt in timed to the Chinese speech, + `<Name>_ZH_dub.en.srt`
 
-`S=C:\Users\augus\.claude\skills\video-chinese-dub\scripts`. Work in a scratch workdir (session scratchpad). Set `PYTHONIOENCODING=utf-8` on every python call that prints Chinese.
+`S=%USERPROFILE%\.claude\skills\video-chinese-dub\scripts`. Work in a scratch workdir (session scratchpad). Set `PYTHONIOENCODING=utf-8` on every python call that prints Chinese.
 
 ## Steps
 
