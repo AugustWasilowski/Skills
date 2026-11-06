@@ -1,0 +1,4 @@
+interface:
+  display_name: "PCG City Planner"
+  short_description: "Build modular PCG settlements and their editor tools"
+  default_prompt: "Use $pcg-city-planner to build or extend a modular procedural settlement and its map editor using the current art kits and gameplay constraints."

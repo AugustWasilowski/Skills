@@ -1,0 +1,3 @@
+interface:
+  display_name: "Modular Architecture Kit"
+  short_description: "Build grid-based architectural kits for artist handoff"
