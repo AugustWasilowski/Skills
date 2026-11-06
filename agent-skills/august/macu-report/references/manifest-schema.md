@@ -14,10 +14,12 @@ open the ep5 manifest to build a new one (ep5 is just a fuller worked example if
 
 ```json
 {
-  "episode": "ep6",
+  "episode": "ep-006",          // the slug (folder name)
   "title": "The MACU Report — Episode 6",
   "version": 1,
-  "authored_by": "leo",
+  "season": 1,                  // weekly arc: 5 eps/week (M–F); ep-006 = S01
+  "episode_num": 1,             // 1..5 within the season (see SKILL.md step 6 formula)
+  "authored_by": "max",
   "voice":    { ... },          // Piper HAL — copy as-is
   "comfyui":  { ... },          // LOCKED render settings — copy as-is, do not regress
   "style":    { "suffix": "...", "negative": "..." },   // from the bible
@@ -27,7 +29,8 @@ open the ep5 manifest to build a new one (ep5 is just a fuller worked example if
   "subtitles":{ ... },          // Better VCR font
   "characters": { "<key>": { "seed": N, "core": "..." }, ... },
   "broll":      { "<key>": "<core prompt>", ... },
-  "cues": [ ... ]
+  "cues": [ ... ],
+  "overlays": [ ... ]            // optional — spanning title-card graphics (see Spanning graphics)
 }
 ```
 
@@ -35,8 +38,8 @@ open the ep5 manifest to build a new one (ep5 is just a fuller worked example if
 
 ```json
 "voice": {
-  "default":   { "engine": "piper", "endpoint": "http://<MEDIA_SERVER_IP>:5050/" },
-  "endpoints": { "piper": "http://<MEDIA_SERVER_IP>:5050/", "omnivoice": "http://<MEDIA_SERVER_IP>:3900" },
+  "default":   { "engine": "piper", "endpoint": "http://127.0.0.1:5050/" },
+  "endpoints": { "piper": "http://127.0.0.1:5050/", "omnivoice": "http://127.0.0.1:3900" },
   "format": "wav 24000Hz mono s16",
   "out_pattern": "vo/<cue_id>.wav",
   "speaker_map": {
@@ -47,11 +50,16 @@ open the ep5 manifest to build a new one (ep5 is just a fuller worked example if
 "comfyui": {
   "workflow": "will-smith-modelscope-t2v",
   "checkpoint": "zeroscope_v2_576w",
-  "endpoint": "http://<MEDIA_SERVER_IP>:8188/",
+  "endpoint": "http://127.0.0.1:8188/",
   "frames": 24, "width": 384, "height": 384, "steps": 30, "cfg": 15, "extract_fps": 8,
   "out_pattern": "clips/<shot_id>.webp"
 }
 ```
+> **Endpoints are local on Max.** The services run on this box, so the canonical host is `127.0.0.1`
+> (OmniVoice in particular binds loopback-only, and stage 1 hardcodes `http://127.0.0.1:3900` in `lib.py`
+> regardless of what the manifest says). Older episodes carry `http://127.0.0.1:...` here — that still works
+> from Max (Piper/ComfyUI bind `0.0.0.0`), so you don't need to rewrite existing manifests; just use
+> `127.0.0.1` in new ones.
 **Why locked:** zeroscope_v2_576w (not DAMO ModelScope) removes the baked-in shutterstock watermark; 384×384
 keeps the required 1:1 square, fits the 2080 Ti's 11 GB at 24 frames, and pulls the B&W cue harder than 16:9.
 Bumping to 576×320×24f triggers ComfyUI lowvram offload and crashes the temporal modules — don't.
@@ -89,7 +97,11 @@ Characters have distinct voices now (via the OmniVoice TTS), not one HAL for eve
 - `voice.speaker_map` is **authored per episode**. Keys are the **exact cue `speaker` strings**, case- and
   punctuation-sensitive (`RON`, `MOTHER MARIGOLD`, `TALLY MAN`, `MR. CRICKET`, `THE VENDOR`, `SAFE`, …). Each
   value is `{ "engine": "omnivoice"|"piper", "profile_id"?: "<8-hex>", "voice_name"?: "<display>" }`.
-  - OmniVoice voices need a `profile_id` (and a `voice_name` for readability).
+  - OmniVoice voices bind by **`voice_name`** — that's the portable identity. `profile_id` is a machine-local
+    hint: at render time stage 1 resolves the live OmniVoice roster by id first, else **self-heals by name**
+    (import/export mints a NEW profile_id per machine, so a pinned id from another box is *expected* to miss).
+    Always set `voice_name`; `profile_id` is optional and may be stale. If neither id nor name resolves the
+    stage fails loud — it refuses to render a wrong fallback voice; import/clone the voice, then re-render.
   - Piper has one voice, **HAL** — no profile_id, just `{ "engine": "piper", "voice_name": "HAL" }`.
 - **Every distinct speaker in `cues[]` should have a `speaker_map` entry.** Unmapped speakers silently fall
   back to `voice.default` (Piper HAL) — fine for a deliberate robot, wrong for a person.
@@ -119,8 +131,9 @@ Characters have distinct voices now (via the OmniVoice TTS), not one HAL for eve
 | Snoop | `31649b70` | Snoop Dogg — laid-back drawl (weaker clone, short ref) |
 | **HAL** (piper) | — | calm, formal, faintly menacing machine — **reserve for AI/appliance characters** |
 
-Need a voice that isn't here? Clone one on Max: `/mnt/storage/shares/MACU/voices/clone_one.sh <Name> <ref.mp3>`,
-which prints a new persistent `profile_id`. (That's a Max-side step — ask via the render handoff.)
+Need a voice that isn't here? Clone one locally: `/mnt/storage/shares/MACU/voices/clone_one.sh <Name> <ref.mp3>`,
+which prints a new persistent `profile_id`. (`docker start omnivoice` first — the container is stopped between
+renders; stop it again afterward to keep the GPU clean for ComfyUI.)
 
 ### EP5 casting (worked example)
 
@@ -128,12 +141,15 @@ RON→Burgundy, WALTER→Walter, MOTHER MARIGOLD→Laura, TALLY MAN→David, BAR
 NORM→Howie, ANNOUNCER→Announcer, and the two machines — **THE VENDOR→HAL, SAFE→HAL** (Piper). HAL on the
 appliances is the joke; everyone else gets a real voice.
 
-### Voice gotchas (encode in the handoff if relevant)
+### Voice gotchas
 
-- **Stage 1 (VO) must run on Max** — OmniVoice binds to `127.0.0.1:3900` (loopback-only); there's no remote path.
+- **Stage 1 (VO) runs on Max** — OmniVoice binds to `127.0.0.1:3900` (loopback-only), which is exactly where
+  you are; there's no remote path and none is needed.
 - **Serial**: ~3 s per OmniVoice cue, ~0.5 s per Piper cue (OmniVoice asserts under concurrency).
 - **VO-only iteration**: change `voice.speaker_map` or a cue's text, delete just the affected `vo/<cue>.wav`,
-  `touch` the rest forward past the manifest mtime, then re-render `from_stage: 1`. Stages 4-8 cascade.
+  then re-render `--from 1`. Stages 4-8 cascade. (The stage-1 cache is now keyed by per-cue text+voice hash in
+  `vo/.cache.json`, so a manifest edit that doesn't touch a cue's own inputs no longer forces its wav to
+  regen — see the `macu-render` skill.)
 
 ## cues[] — one per spoken line
 
@@ -158,6 +174,14 @@ appliances is the joke; everyone else gets a real voice.
   - `{"kind":"title","asset":"macu_report_title"|"macu_report_bumper"|"thumb"}` — looked up under
     `episodes/<slug>/titles/<asset>.mp4`. Add `"fill":"loop"` to loop the card across its whole slot (the
     open card); default holds the last frame (`tpad`).
+  - **Cloud shots** (Higgsfield / local InfiniteTalk backends — not the zeroscope path above):
+    - `{"kind":"lipsync","who":"<characters key>","source_still":"<key|path>"}` — audio-driven talking head;
+      the cue VO drives the mouth. The prompt comes from **`lipsync_prompt`** (per-shot, or
+      `characters[who].lipsync_prompt`), **never the character `core`** — a scene/action core makes the model
+      dramatize the scene and stop lip-syncing; the default is a neutral talking-head line. Use a **tight
+      frontal still** (head & shoulders); a wide/small-face still has no mouth to drive (the render warns but
+      doesn't block). Editing `lipsync_prompt` re-renders that clip.
+    - `{"kind":"higgsfield","who":"<broll key>","source_still"?:"..."}` — i2v cloud video (no audio sync).
 
 ## Authoring conventions (from the proven EP5 run)
 
@@ -165,7 +189,11 @@ appliances is the joke; everyone else gets a real voice.
   generates once and the assembler reuses it. This is why episodes are cheap (~28 unique gens for a 36-shot
   episode). Only give a character multiple seeds if you deliberately want different looks.
 - **B-roll keys can repeat** (e.g. `empty_room` reused as a recurring location) and share one master. Want a
-  *different* empty room per cue? Give them distinct keys (`empty_room_a`, `empty_room_b`).
+  *different* empty room per cue? Give them distinct keys (`empty_room_a`, `empty_room_b`). On the **cloud**
+  path the same is true automatically: two cloud b-roll shots with identical content (same source/prompt/still)
+  render **one** paid generation and reuse the clip per cue — crop/trim/pan still apply per cue. (Lipsync is
+  never deduped; its audio differs per cue.) So don't hand-merge repeated b-roll to "save credits" — the
+  pipeline already does.
 - **Title slots fill their full per-shot share** — the assembler clones the last title frame (`tpad`) if the
   title MP4 is shorter than the slot. Never cap a title to a fixed short duration; that truncates VO.
 - **`render_rule`** is a prose field the assembler reads; copy EP5's verbatim (it documents full_prompt =
@@ -186,10 +214,53 @@ burns no subtitle. Two modes — set `hold_style`:
   since freeze is the default.
 
 **SFX one-shots**: a top-level `sfx` block (sibling to `music`) — `{ "cue", "file", "gain", "at": "start|end" }`
-entries mixed at a cue's timestamp via the same stage-5 adelay→amix chain as music beds. Files live in the
-shared `assets/sfx/` dir (CC0, reusable). Missing file → skipped gracefully. Tonal SFX (dings, sweeps, hums,
-clicks) can be synthesized with ffmpeg into `assets/sfx/`; realistic ones (coins, etc.) are sourced CC0 from
-freesound. (Both `hold` cues and the `sfx` block were added to Max's pipeline in the ep10 work.)
+entries mixed at a cue's timestamp via the same stage-5 adelay→amix chain as music beds. `file` is the bare
+basename (no path), resolved as `assets/sfx/<file>`. Missing file → skipped gracefully. **Three ways to get a
+file into `assets/sfx/`** (all normalize to 24 kHz mono s16 / −3 dBFS): (1) **`agen` generation** — bespoke
+text-to-foley for any sound the script calls for (bonk, car engine, door slam): `python3
+pipeline/agen_sfx.py "<prompt>" <basename>` or the Studio Audio-panel "Generate (agen)" toggle; (2) **freesound
+CC0** via `pipeline/freesound_fetch.py "<query>" <basename>`; (3) **ffmpeg lavfi synth** for tonal sounds.
+agen output is public-domain (de novo) and reproducible (prompt + seed logged). (Both `hold` cues and the `sfx`
+block were added in the ep10 work; `agen` generation added 2026-06.)
+
+**Generated music beds**: `music.clips[]` isn't limited to the big-band theme — generate a bed from a prompt
+with `python3 pipeline/agen_music.py "<prompt>" <basename> [--engine music|riff]` (or the Studio music-gen
+endpoint), then add `<basename>.wav` to `music.clips[]`. `music` = MusicGen (warbly, drifts past ~15–20s);
+`riff` = Riffusion (tape-degraded lo-fi). Both land in `assets/music/` and fit the jank — use them for sickly
+jazz, broken-broadcast stings, ominous drones, etc. Same GPU gate as SFX (won't run during a render).
+
+## Spanning title-card graphics (`overlays[]`) — the video twin of music beds
+
+A title card can be placed **across a range of cues** (not just inside one cue's `shots[]`) via a top-level
+`overlays[]` block — the video analogue of `music.beds[]`. Each placement is **cue-tethered** so it survives
+retiming/regen (the same way bed refs do), with sub-cue offsets so the Studio timeline can drag/resize freely:
+
+```jsonc
+"overlays": [
+  {
+    "id": "ov_001",            // stable id, minted ov_NNN by gen_manifest (don't hand-set)
+    "asset": "the_feast",      // key into title_assets — the existing card IS the graphic
+    "mode": "insert",          // "insert" = full-frame card REPLACES footage; "overlay" = composited ON TOP
+    "anchor_cue": "c04",       // cue the start is tethered to (validated like a bed ref; stale → dropped+warned)
+    "start_offset": 0.0,       // seconds into anchor_cue where it begins
+    "duration": 23.0,          // seconds on screen
+    // overlay-mode only (ignored by insert):
+    "position": "lower_third", // lower_third | bug_tl | bug_tr | center | full
+    "scale": 1.0, "opacity": 1.0, "fade_in": 0.3, "fade_out": 0.3
+  }
+]
+```
+
+- **Timing** resolves to absolute seconds via the cumulative per-cue offset (`start_s = cum[anchor_cue] +
+  start_offset`), exactly mirroring stage 5. The render reads `.work/cue_durs.json`.
+- **`insert`** works with the existing opaque 1024² cards (cut-to-card across the span). **`overlay`** composites
+  the card over the moving footage; it prefers a true-alpha asset `titles/<asset>.webm` (set `render_args.alpha:
+  true` on the title to emit one from a transparent composition) and otherwise **keys black** out of the opaque
+  `<asset>.mp4` (MACU cards are white-on-black, so the text/graphics composite cleanly).
+- **Authoring**: drag a card onto a cue on the Studio **Graphics dope sheet**, then drag/resize the bar on the
+  **Video ▸ Timeline**. Persisted via `PUT /api/episodes/<slug>/overlays`. Empty/absent `overlays` = no-op.
+- Baked in by **stage 4b** (runs at the tail of stage 4 — see pipeline-and-handoff). Editing overlays re-runs
+  assemble (any manifest edit already invalidates its cache).
 
 ## Episode bookends — the animated open & the next-episode bumper
 
@@ -245,6 +316,6 @@ shots (put them in `title_assets`); `thumb_wide.mp4` is not.
 
 ## Worked reference
 
-`E:\August\MACU\MACU\episodes\ep5\manifest.json` is the canonical, validated example — read it when in doubt.
+`/mnt/storage/shares/MACU/episodes/ep-005/manifest.json` is the canonical, validated example — read it when in doubt.
 Copy its `voice`, `comfyui`, `style`, `render_rule`, `music`, `subtitles` blocks into a new episode and only
 change `episode`/`title`/`characters`/`broll`/`cues` and the music bed cue ids.

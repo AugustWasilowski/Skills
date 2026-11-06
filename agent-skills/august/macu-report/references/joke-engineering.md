@@ -1,8 +1,8 @@
 # Joke engineering — how MACU builds and pays off comedy
 
 Source: Matthew Meredith, "How Arrested Development Engineered TV's Funniest Episode" (analysis of
-S2E3 "Amigos"). Full transcript at `E:\August\MACU\MACU\agent-io\max\ad_joke_engineering_transcript.txt`
-(Max can re-pull any YouTube transcript on request — see SKILL.md).
+S2E3 "Amigos"). Full transcript at `/mnt/storage/shares/MACU/agent-io/max/ad_joke_engineering_transcript.txt`
+(re-pull any YouTube transcript yourself when you need fresh source material — see SKILL.md step 2).
 
 **The thesis worth internalizing:** the funniest episodes aren't the ones with the most jokes per minute,
 they're the ones with the most *interconnection* — "by the end, no line feels isolated. Every moment is
@@ -75,4 +75,21 @@ deliberate long-fuse plants in `MACU_Story_Arcs.md` so future episodes remember 
 
 ## 7. Ease the seams — toss into and out of every segment
 
-A newscas
+A newscast's native weakness is the hard cut: a segment ends, the next begins, no connective tissue — the
+"and then" of *structure*. Real broadcasts solve it with the toss; we make every toss a joke slot.
+
+- **Toss in.** The anchor hands off with a line that carries an attitude, a misread, or a quiet alarm about
+  what's coming ("Now to Chip, who assures us he is fine."). The toss sets the segment's angle so the cut is
+  earned instead of abrupt — and it's a free plant slot (section 1).
+- **Button out, then undercut.** Every segment ends on a blackout-style button; then the anchor reframes it
+  in one flat line before moving on (Walter's "Anyway." — the anchor undercut from section 5). Button +
+  undercut is the seam. Never cut straight from a segment's last line into the next segment's first.
+- **Weather and commercials are not exempt.** Don't hard-cut into an ad — have the anchor sell the
+  transition with misplaced gravity ("We owe them everything. Commercial."). The weather toss is a recurring
+  two-hander slot where the Ron/Walter handoff can take the arc's temperature each week.
+- **The toss is a causality device.** When a handoff references what just aired, the episode reads as
+  but/therefore instead of a stack of disconnected segments — segment order starts to *matter*, which is the
+  South Park check applied at the structural level.
+
+When auditing a draft: read only the first and last line of each segment, in order. If that skeleton isn't
+funny or doesn't flow, the seams need work no matter how good the segment interiors are.

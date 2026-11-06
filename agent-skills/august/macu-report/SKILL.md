@@ -8,8 +8,8 @@ description: >-
   Trigger on phrases like "new MACU episode", "write a MACU Report", "MACU segment/ad/character",
   "make episode N", "let's generate the MACU video", or any mention of Ron, Walter, The MACU Report, or the
   Mayor Awesome universe — even if the word "skill" is never said. The skill brainstorms and writes the
-  script with August first, builds the episode manifest, and (only on his explicit OK) hands the render off
-  to Max via Vikunja.
+  script with August first, builds the episode manifest, and (only on his explicit OK) renders the episode
+  locally via the `macu-render` pipeline on Max.
 ---
 
 # The MACU Report — episode generator
@@ -18,10 +18,14 @@ The MACU Report is a recurring fake newscast inside the **Mayor Awesome Cinemati
 comedic, intentionally-janky, black-and-white, analog, post-apocalyptic retro-future. Two anchors (Ron and
 Walter) cut to absurd, often creepy segments, ads, and sponsors. The "bad early-AI-video" look is the joke.
 
-This skill drives the whole creative front end: **brainstorm + write the script with August → turn it into a
-render manifest → hand the heavy generation off to Max.** August authors here on Leo (his Windows box / this
-session); all GPU + audio + assembly work runs on **Max** (the Linux home server), reached over a shared
-Syncthing folder and the Vikunja coordination board.
+This skill drives the whole production: **brainstorm + write the script with August → turn it into a render
+manifest → render it.** You are **Max** (the Linux home server, agent `max-claude`) and you do all of it
+locally — the creative authoring AND the GPU + audio + assembly render. Everything lives under
+`/mnt/storage/shares/MACU/`; the render runs through the local `macu-render` skill
+(`pipeline/run.py`) on this box. No cross-machine handoff, no Syncthing sync wait, no Vikunja relay — when the
+script and manifest are approved you invoke the render directly and watch it. (Historical note: this skill was
+written on Leo, August's Windows box, which authored episodes and shipped the render to Max over Syncthing +
+Vikunja. Max now owns both halves, so those network hops are gone.)
 
 ## Before you start — read the references
 
@@ -33,8 +37,9 @@ These hold the canon and the mechanics. Read the ones you need; don't reinvent t
 - `references/manifest-schema.md` — the exact `manifest.json` shape, the **locked render settings** (do not
   regress these), music + subtitle blocks, and authoring conventions (seed reuse, b-roll keys, title slots,
   per-shot timing).
-- `references/pipeline-and-handoff.md` — what Max's pipeline does end-to-end, the gotchas to respect, and the
-  **precise Vikunja handoff procedure** (project, user ids, the assignee proxy, how to ping and poll).
+- `references/pipeline-and-handoff.md` — what the local pipeline does end-to-end, the local service endpoints,
+  the gotchas to respect, how to trigger the render with `macu-render`, and how to report back if the render
+  came in as a Vikunja task.
 - `references/joke-engineering.md` — how to build and pay off comedy across an episode (seed-and-detonate,
 - `references/OmniVoice_Voice_Tips.md` (BUNDLED) — voice SHAPING: the `speed` / `seed` / `instruct` / `guidance_scale` knobs and the full `/generate` reference. Two rules that bite: (1) `instruct` is a CONSTRAINED voice-design vocab (gender/age/pitch/accent/whisper) and 400s on emotion words — drive warm/cold/urgent from the LINE TEXT (punctuation), not `instruct`; (2) the stage-1 OmniVoice wrapper does NOT pass `speed` yet, so until it's patched, differentiate registers by text and render a cold/flat MACHINE register (e.g. STRIDE cold) from Piper HAL `:5050`. The live voice index is `OmniVoice_Voice_Roster.md` (project root — source of truth; the running registry wins over the doc).
   pattern-then-break, stacked callbacks, two-track lines, post-production as a writer's room, brazen
@@ -42,10 +47,12 @@ These hold the canon and the mechanics. Read the ones you need; don't reinvent t
   engineered rather than just a list of bits. It anchors three shows: Arrested Development (interconnection),
   South Park (the but/therefore causality rule), and 30 Rock (joke texture).
 - `references/writers-room.md` — the critique loop: after a draft, dispatch a panel of subagent critics
-  (Enthusiast, Skeptic, Overthinker + a Showrunner craft critic), synthesize, revise, repeat. Run it to punch
+  (Enthusiast, Skeptic, Overthinker + a Showrunner craft critic, + the Docent exposition critic on pilots/
+  premieres/new-world episodes), synthesize, revise, repeat. Run it to punch
   up an episode — always for big-swing/arc episodes.
-- `references/police-squad-pass.md` — the **deadpan non-sequitur** punch-up pass (run after the writers'
-  room): the rule, named techniques, and the canonical worked examples.
+- `references/police-squad-pass.md` — the show flavor doc for the **Comedy Punch-Up pass** (formerly the
+  Police Squad pass; run after the writers' room): the rule, named techniques, and the canonical worked
+  examples. The general craft lives in the `comedy-punch-up-pass` skill.
 - `references/thumbnail.md` — the episode **animated open, thumbnail & end bumper**: the locked monochrome
   look, the TONIGHT/MACU-Report intro animation, the title-card flicker, the open VO gag, the next-ep bumper,
   fill-in Hyperframes templates, and how the bookend cues wire in.
@@ -91,11 +98,11 @@ Save the script to `episodes/<slug>/script.md` (readable screenplay form, with a
 so it doubles as the shot list — see EP5). Revise with August until he's happy. **Do not move on to the
 manifest until the script is approved.**
 
-**Need source material? Ask Max.** Max has a YouTube→transcript skill (and general web research reach Leo's
-sandbox lacks). When August references a video, talk, or article he wants the writing informed by, hand Max
-a Vikunja task to pull it into the synced folder (`agent-io/max/`) and comment back — same handoff procedure
-as a render (see `references/pipeline-and-handoff.md`). That's how `references/joke-engineering.md` was
-built.
+**Need source material? Pull it yourself.** You have web research (WebFetch / WebSearch), a
+YouTube→transcript path, and full LAN reach — no sandbox in the way. When August references a video, talk, or
+article he wants the writing informed by, fetch the transcript/text directly and drop it under
+`/mnt/storage/shares/MACU/agent-io/max/` (where `references/joke-engineering.md` was built from). No task or
+handoff needed — it's all local now.
 
 ### 2.5 Run the writers' room (critique loop)
 
@@ -103,18 +110,22 @@ Before locking a script — **always for a big-swing/arc/breakout episode**, opt
 the critique loop in `references/writers-room.md`. It dispatches a panel of subagent critics at the draft:
 three audience personas (the Enthusiast, the Skeptic, the Overthinker — adapted from August's
 `comedy-writers-room` skill) plus a **Showrunner** craft critic that scores the script against the
-Arrested Development / South Park / 30 Rock rubric and MACU canon. Synthesize their reactions, revise, and
+Arrested Development / South Park / 30 Rock rubric and MACU canon, plus — on pilots, premieres, and
+new-world/new-character episodes — the **Docent**, the exposition critic (is there enough backstory for a
+newcomer, and is every explanation itself a dry joke?). Synthesize their reactions, revise, and
 loop (cap ~2–3 passes). Protect the weird — cut confusion, never strangeness — and don't homogenize the
 voices. Trigger it whenever August says "punch this up" / "get the room on it," and after his Saturday
 review of the auto-drafts. Then continue to the cast lock and manifest.
 
-### 2.6 The Police Squad pass (deadpan non-sequiturs)
+### 2.6 The Comedy Punch-Up pass (deadpan non-sequiturs + paraprosdokians)
 
-After the writers' room and before locking the cast, run one more focused pass — the **Police Squad pass**.
-An expert agent threads **deadpan non-sequiturs** into the revised script in the Police Squad! / Airplane!
-(Zucker-Abrahams-Zucker) tradition: a character states something alarming or quietly devastating in a
-completely settled register, nobody reacts, and the scene just moves on. Walter (the announcer) and the
-machines (STRIDE, the Vendor, SAFE) are the prime vehicles; Ron is the pressure valve who *almost* notices.
+After the writers' room and before locking the cast, run one more focused pass — the **Comedy Punch-Up pass**
+(formerly the Police Squad pass; the `comedy-punch-up-pass` skill). An expert agent threads **deadpan
+non-sequiturs** and **paraprosdokians** (sentences whose last clause takes a hard left and re-frames the whole
+line) into the revised script in the Police Squad! / Airplane! (Zucker-Abrahams-Zucker) tradition: a character
+states something alarming or quietly devastating in a completely settled register, nobody reacts, and the
+scene just moves on. Walter (the announcer) and the machines (STRIDE, the Vendor, SAFE) are the prime
+vehicles; Ron is the pressure valve who *almost* notices.
 
 Read `references/police-squad-pass.md` for the rule, the named techniques, and the canonical worked examples.
 Run it like the writers' room — dispatch it as a subagent that returns **only proposed insertions** (segment
@@ -133,13 +144,17 @@ number not already used). Same for new environments/b-roll.
 voice catalog in `references/manifest-schema.md`). Match voice to character — an Attenborough for an ominous
 narrator, a cheerful infomercial pitch for a huckster — and **reserve HAL for AI/appliance characters**
 (SAFE, the Vendor). The bible records each recurring character's voice; carry it forward. If no catalogued
-voice fits a new character, note that a new clone is needed — that's a quick Max-side step in the handoff.
+voice fits a new character, clone one locally before the render — a quick step:
+`/mnt/storage/shares/MACU/voices/clone_one.sh <Name> <ref.mp3>` (start the `omnivoice` container first; see
+`references/manifest-schema.md`).
 
 **Persist new characters to the living bible** so they're canon next time: the bundled `references/character-bible.md`
-is a starting snapshot, but the project's working copy at `E:\August\MACU\MACU\MACU_Character_Prompt_Bible.md`
-(synced to Max) is the source of truth — add new cast there. (In a sandbox/dry-run with no access to that path,
-just note the addition in your output instead of writing it.) The character also goes in the manifest's
-`characters{}` regardless, so a render never depends on the bible file.
+is a starting snapshot, but the project's working copy at
+`docs/shows/the-macu-report/MACU_Character_Prompt_Bible.md` (in the macu-pipeline repo; editable in MACU Studio's
+Canon Docs panel with The MACU Report selected) is the source of truth — add new cast there. shotgen/cardgen read
+this per-show copy by the manifest's `show` id. *(Moved 2026-06-06 from the old flat `/mnt/storage/shares/MACU/…`
+path during the per-show docs namespacing; that share copy was retired to `…md.retired-2026-06-06`.)* The
+character also goes in the manifest's `characters{}` regardless, so a render never depends on the bible file.
 
 ### 3.5 Episode bookends — the animated open & the next-episode bumper (EVERY episode)
 
@@ -182,6 +197,8 @@ Create `episodes/<slug>/manifest.json` following `references/manifest-schema.md`
 
 - Copy the **locked `comfyui` block** (zeroscope_v2_576w @ 384×384×24f, steps 30, cfg 15, fps 8) — this is
   what makes watermark-free + square + B&W + VRAM-fit all true at once. Don't bump resolution.
+- **Set `season` + `episode_num`** (top-level ints) from the weekly formula (ep-006 = S01-E1; see step 6). The
+  `episode` field stays the slug (`"ep-NNN"`); `season`/`episode_num` are the new metadata Studio + YouTube read.
 - Carry the `style` (suffix + negative), `music` (intro/outro big-band theme beds), and `subtitles` (Better
   VCR font) blocks forward.
 - One cue per spoken line: `{id, segment, speaker, vo, shots[]}`. Shots reference `characters[*]`,
@@ -190,6 +207,15 @@ Create `episodes/<slug>/manifest.json` following `references/manifest-schema.md`
 - **Bookend the episode** (step 3.5): a front `c00` open cue (Walter's gag VO over the animated `intro` card —
   `pad_seconds:2.0`, `no_subs:true`) and a closing bumper cue (Walter teases next over the `next` card). Put
   `intro` and `next` in `title_assets`; add `c00` to the intro bed and the bumper to the outro bed.
+- **Sound design is now first-class — write for it.** Beyond the big-band theme, we can **generate bespoke
+  music and SFX from text prompts** locally (the `agen` models: AudioGen for foley, MusicGen/Riffusion for
+  beds). So when the script wants a *specific* sound — a bonk, a car engine turning over, a door slam, an
+  ominous hum — or *background music* for a segment (sickly jazz under the weather, a lo-fi sting on a
+  reveal), **write it in** and spec it: a `sfx[]` one-shot pinned to the cue, or a generated bed in
+  `music.clips[]`. You don't have to limit yourself to the existing kit. See `references/manifest-schema.md`
+  for the `sfx`/`music` shapes and the three acquisition routes (freesound CC0 · `agen` generation · ffmpeg
+  synth); generated audio is public-domain and reproducible (prompt + seed logged). Lean into the jank —
+  MusicGen's drift and Riffusion's tape degradation *fit* the MACU aesthetic.
 
 Then **validate** it:
 
@@ -197,29 +223,40 @@ Then **validate** it:
 python scripts/validate_manifest.py episodes/<slug>/manifest.json
 ```
 
-Fix anything it flags (broken refs, seed mismatches, duplicate ids, missing locked settings) before handoff —
-bad manifests are slow to debug after they've been sent.
+Fix anything it flags (broken refs, seed mismatches, duplicate ids, missing locked settings) before the
+render — bad manifests are slow to debug once the GPU's been spinning.
 
-### 5. Confirm, then hand off to Max (build-then-confirm)
+### 5. Confirm, then render (build-then-confirm)
 
-Before sending anything, show August a short summary: episode slug, runtime estimate, cue/shot counts, **which
-characters are new** (and their seeds), and the rough render cost (~30–40s GPU per unique master + a few min
-assembly). Get his explicit OK.
+Before kicking off the render, show August a short summary: episode slug, runtime estimate, cue/shot counts,
+**which characters are new** (and their seeds), and the rough render cost (~30–40s GPU per unique master + a
+few min assembly; a full cold run is ~13 min, dominated by the whisper stage). Get his explicit OK.
 
-**The handoff has real side effects** — it creates a Vikunja task, pings Max's live session, and can kick off
-a ~25-minute GPU render. So never fire it on assumption: only create/assign the task after August has
-explicitly approved the build. If you're unsure, dry-running, or being tested, stop at the summary and ask —
-producing the script and a validated manifest is the win; sending is a separate, deliberate step.
+**The render has real side effects** — it spins up the GPU (OmniVoice + ComfyUI), ties up the 2080 Ti for
+~13 minutes, and lights the StackChan progress bar. So never fire it on assumption: only start the render
+after August has explicitly approved the build. If you're unsure, dry-running, or being tested, stop at the
+summary and ask — producing the script and a validated manifest is the win; rendering is a separate,
+deliberate step.
 
-On his go, hand the render to Max via Vikunja — full procedure in `references/pipeline-and-handoff.md`. In
-short: confirm the episode folder has synced to Max, create a task on project 3 describing the episode +
-manifest path, **assign it to Max (user id 5) via the n8n assignee-proxy workflow** (the MCP `assign` is a
-silent no-op — the proxy is the only thing that works *and* pings him), and verify the assignee took.
+On his go, **render it locally** — invoke the `macu-render` skill on this box (full pipeline detail in
+`references/pipeline-and-handoff.md`):
 
-Then tell August it's running and that he should **ping you to check the board** when Max responds — you have
-no notification hook for replies. When he does, pull Max's comment and relay the result (and the output
-paths: `episodes/<slug>/final/<slug>.mp4` plus the YouTube thumbnail
-`episodes/<slug>/final/<slug>_thumb.png`, both of which sync back to Leo).
+```
+/macu-render <slug>            # full 8-stage cold render
+/macu-render <slug> --from 5   # music + whisper(cached) + srt + burn — for sub/music tweaks
+/macu-render <slug> --only 8   # re-burn subs only, on the cached nosubs cut
+```
+
+(Equivalently `python3 /mnt/storage/shares/MACU/pipeline/run.py <slug>` with the same `--from`/`--only`
+flags.) Watch the stages stream by; you don't need a notification hook or to "check a board" — you're running
+it. When it finishes, relay the result and the output paths to August:
+`episodes/<slug>/final/<slug>.mp4`, the thumb strip `episodes/<slug>/final/<slug>_thumbs.jpg`, and the
+1920×1080 YouTube still `episodes/<slug>/final/<slug>_thumb.png`. Send the thumb strip with `SendUserFile` so
+he has it without opening the share.
+
+**If this render was requested via a Vikunja task** assigned to you (`[MACU]` + render in the title on project
+3), still post the per-stage timing table + output path back as a task comment when done — that's the
+`macu-render` report-back format, and it keeps the board honest.
 
 ### 6. Write the YouTube copy
 
@@ -227,8 +264,11 @@ Every episode also gets publish-ready copy saved to `episodes/<slug>/youtube.txt
 straight to YouTube. You can do this as soon as the script is locked (it doesn't depend on the render).
 Write it in MACU voice — in-universe, dry, a little menacing — but discoverable. Include:
 
-- **2–3 title options** (one straight "Episode N: <subtitle>", one hooky/segment-led, one punchy quote or
-  clickbait-ish line). Lead with the episode's best gag.
+- **2–3 title options.** The **straight option must carry the Season/Episode label**:
+  `The MACU Report — S0X-EY (Ep. N): <subtitle>`. Releases are 5/week (Mon–Fri) = one **Season**, so people
+  read each week as a self-contained arc. Formula (ep-### with N≥6): `season = (N-6)//5 + 1`,
+  `episode = (N-6)%5 + 1` — ep-006 = **S01-E1** … ep-010 = S01-E5, ep-011 = **S02-E1**, etc. (ep-005 and earlier
+  have no S/E.) The other 1–2 options stay hooky/segment-led or a punchy quote — lead with the episode's best gag.
 - **A description**: an in-universe hook paragraph, then a `Segments: A • B • C` line, then the standard
   boilerplate sign-off line — _"The MACU Report is a black-and-white, post-apocalyptic, retro-futurist
   faux-newscast from the Mayor Awesome Cinematic Universe."_ — capped with that episode's signoff tag.
@@ -236,17 +276,24 @@ Write it in MACU voice — in-universe, dry, a little menacing — but discovera
   #retrofuturism #analoghorror #aigenerated #fauxnewscast #darkcomedy`) and add 1–3 episode-specific ones
   (e.g. `#60Minutes`, `#gameshow`, `#wernerherzog`, `#vincentprice`).
 
-Use the existing `episodes/ep5|ep6|ep7/youtube.txt` files as the format template. Offer August a quick tone
-tweak (punchier vs. deadpan) but the file is the deliverable — don't just print it in chat.
+Use the existing `episodes/ep-005|ep-006|ep-007/youtube.txt` files as the format template. Offer August a
+quick tone tweak (punchier vs. deadpan) but the file is the deliverable — don't just print it in chat.
 
 ### 7. Iterate
 
 Re-renders are cheap and incremental: VO/masters/titles are cached, so tweaks (a new line, a different sub
 style, the music gain) only redo what changed. If August wants changes after seeing a cut, update the
-script/manifest and send Max a focused follow-up rather than regenerating everything.
+script/manifest and re-run a focused stage range (`/macu-render <slug> --from N`) rather than regenerating
+everything — `--from 8` re-burns subs in ~15s, `--from 5` redoes music + subs.
 
 ## Notes
 
-- **You can't reach Max's LAN or pull renders directly from this session** — the sandbox allowlist blocks
-  `<MEDIA_SERVER_IP>` and external webhooks. Move everything through the synced Syncthing folder and the bridged
-  MCPs (Vikunja, the n8n render/assignee proxies); see `references/pipeline-and-handoff.md`.
+- **Everything is local on Max.** The whole project tree is under `/mnt/storage/shares/MACU/`, the render
+  pipeline is `pipeline/run.py` (driven by the `macu-render` skill), and the GPU/TTS services are on this box
+  (ComfyUI `:8188`, Piper HAL `:5050`, OmniVoice `:3900`). No Syncthing, no Vikunja relay, no n8n bridge — the
+  cross-machine plumbing in older versions of this skill was for the Leo→Max split, which no longer exists.
+- **Announcing a finished episode** (optional flavor): both paths work from Max — `mcp__stackchan__speak` for
+  the HAL-register robot, or the room-TTS `announce-home` webhook at `http://127.0.0.1:5060/` (StackChan
+  `/play`).
+- That same `S:\` share on August's Windows box maps to `/mnt/storage/shares/` here, so anything you write
+  under `episodes/<slug>/final/` is directly visible to him without a sync wait.

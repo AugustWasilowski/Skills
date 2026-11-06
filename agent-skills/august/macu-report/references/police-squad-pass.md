@@ -5,8 +5,12 @@ reads the revised draft and threads in **deadpan non-sequiturs** in the Police S
 (Zucker-Abrahams-Zucker) tradition: a character states something **alarming, absurd, or quietly devastating
 in a completely settled register**, nobody reacts, and the scene just moves on.
 
-It's a thin, surgical layer — it does not rewrite jokes or plot. It adds 1–2 throwaway beats per segment that
-deepen the MACU's "everyone is serenely calm about the apocalypse" tone.
+It does not rewrite jokes or plot — it LAYERS. **Density mandate (August, 2026-06-11): go DENSE.** The
+viewer should not recover from one joke before the next hits (ZAZ Rule One). Stack channels — dialogue,
+» background sight gags, ticker/lower-third lines, anti-comedy holds — so several beats can share one
+moment. This supersedes the old "1–2 throwaway beats per segment" cap. Quality gate unchanged: settled
+register only, never step on a plot beat, a runner payoff, or an existing punchline; density never
+excuses a wink.
 
 ## The rule
 
@@ -96,6 +100,11 @@ These are the model — match this voice and restraint. (From the "Welcome to th
 
 Dispatch it like the writers' room — a focused expert subagent (or inline if light): hand it the revised
 script + this file and have it return **only proposed insertions** — a segment anchor plus the new line(s) —
-so August can accept/reject each. Default to Walter and the machines; cap at ~1–2 beats per segment; never
-break the plot or step on an existing punchline. Apply the accepted beats, then continue to the cast lock and
-the manifest.
+so August (or his delegated filter) can accept/reject each. Default to Walter and the machines; go DENSE
+per the 2026-06-11 mandate (8–12 proposals per episode is the working rate; the S3 rewrite accepted 54 of
+60 across five episodes); never break the plot or step on an existing punchline. Apply the accepted beats,
+then continue to the cast lock and the manifest.
+
+_Note: the worked examples above are from the "Welcome to the Practice" pass of the UNAIRED, shelved
+Gathering week (Rose/STRIDE/Roscoe were retired with it 2026-06-11). They remain the craft reference —
+match the voice and restraint, not the cast._
